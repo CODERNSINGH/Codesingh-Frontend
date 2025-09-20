@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../contexts/AuthContext.jsx';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   BookOpen, 
@@ -37,6 +38,7 @@ const CourseDashboard = () => {
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonConfig, setComingSoonConfig] = useState({});
   const [activeMainTab, setActiveMainTab] = useState('lectures');
+  const { accessToken } = useContext(AuthContext);
 
   // Lock body scroll when sidebar is open (mobile)
   useEffect(() => {
@@ -69,18 +71,19 @@ const CourseDashboard = () => {
   const fetchCourseData = async () => {
     try {
       setLoading(true);
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const [courseResponse, lecturesResponse] = await Promise.all([
-        axios.get(API_ENDPOINTS.COURSE_DETAIL(courseId)),
-        axios.get(API_ENDPOINTS.COURSE_LECTURES(courseId))
+        axios.get(API_ENDPOINTS.COURSE_DETAIL(courseId), { headers }),
+        axios.get(API_ENDPOINTS.COURSE_LECTURES(courseId), { headers })
       ]);
       
-      setCourse(courseResponse.data);
-      setLectures(lecturesResponse.data);
+      // Extract data from API response format: { success: true, data: {...} }
+      setCourse(courseResponse.data.data || courseResponse.data);
+      setLectures(lecturesResponse.data.data || lecturesResponse.data || []);
       setServerConnected(true);
     } catch (err) {
-      console.error('Error fetching course data:', err);
       setServerConnected(false);
-      setError('Server connection failed. Cannot access course content.');
+      setError(err.response?.data?.message || 'Server connection failed. Cannot access course content.');
     } finally {
       setLoading(false);
     }
@@ -93,6 +96,9 @@ const CourseDashboard = () => {
     }
     navigate(`/course/${courseId}/lecture/${lectureId}`);
   };
+
+  // Ensure lectures is always an array
+  const lecturesArray = Array.isArray(lectures) ? lectures : [];
 
   const handleSidebarItemClick = (item) => {
     if (item.label === 'Lectures') {
@@ -112,7 +118,7 @@ const CourseDashboard = () => {
   };
 
   const sidebarItems = [
-    { icon: BookOpen, label: 'Lectures', color: 'blue', count: lectures.length },
+    { icon: BookOpen, label: 'Lectures', color: 'blue', count: lecturesArray.length },
     { icon: Code, label: 'Online Compiler', color: 'green', count: 0 },
     { icon: FileText, label: 'Assignments', color: 'purple', count: 0 },
     { icon: Trophy, label: 'Contests', color: 'amber', count: 0 },
@@ -177,8 +183,8 @@ const CourseDashboard = () => {
   }
 
   // Separate live lectures
-  const liveLectures = lectures.filter(l => l.lecture_type === 'Live');
-  const recordedLectures = lectures.filter(l => l.lecture_type !== 'Live');
+  const liveLectures = lecturesArray.filter(l => l.lectureType === 'Live');
+  const recordedLectures = lecturesArray.filter(l => l.lectureType !== 'Live');
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -407,7 +413,7 @@ const CourseDashboard = () => {
                               <div className="flex items-center space-x-6 text-sm text-gray-600">
                                 <div className="flex items-center space-x-2">
                                   <Clock className="h-4 w-4" />
-                                  <span>Started {lecture.upload_date ? new Date(lecture.upload_date).toLocaleString() : 'recently'}</span>
+                                  <span>Started {lecture.uploadDate ? new Date(lecture.uploadDate).toLocaleString() : 'recently'}</span>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   <Users className="h-4 w-4" />
@@ -457,7 +463,7 @@ const CourseDashboard = () => {
                               <div className="flex items-center space-x-6 text-sm text-gray-500">
                                 <div className="flex items-center space-x-2">
                                   <Clock className="h-4 w-4" />
-                                  <span>{lecture.upload_date ? new Date(lecture.upload_date).toLocaleString() : `Lecture ${lecture.order}`}</span>
+                                  <span>{lecture.uploadDate ? new Date(lecture.uploadDate).toLocaleString() : `Lecture ${lecture.order}`}</span>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   <Users className="h-4 w-4" />
@@ -478,7 +484,7 @@ const CourseDashboard = () => {
                 )}
 
                 {/* Empty State */}
-                {lectures.length === 0 && (
+                {lecturesArray.length === 0 && (
                   <div className="text-center py-12">
                     <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                       <BookOpen className="h-12 w-12 text-gray-400" />

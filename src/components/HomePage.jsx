@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { AuthContext } from '../contexts/AuthContext.jsx';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, Clock, Users, AlertCircle } from 'lucide-react';
 import axios from 'axios';
@@ -10,8 +11,9 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('current');
-  const [serverConnected, setServerConnected] = useState(false);
+  const [serverConnected, setServerConnected] = useState(true);
   const navigate = useNavigate();
+  const { accessToken } = useContext(AuthContext);
 
   // Fake data for when server is not connected
   const fakeCourses = [
@@ -47,15 +49,14 @@ const HomePage = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Attempting to fetch courses from server...');
+      const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
       const response = await axios.get(API_ENDPOINTS.COURSES, {
-        timeout: 10000 // 10 second timeout for hosted server
+        headers,
+        timeout: 10000
       });
-      console.log('Server response:', response.data);
-
-
-      // Transform the server data to match our expected format
-      const transformedCourses = response.data.map(course => ({
+      // API returns { success, message, data }
+      const apiCourses = response.data.data || response.data;
+      const transformedCourses = apiCourses.map(course => ({
         id: course.id,
         title: course.title,
         description: course.description,
@@ -64,18 +65,12 @@ const HomePage = () => {
         image: course.thumbnail ? course.thumbnail : getCourseImageType(course.title),
         buttonStyle: "primary"
       }));
-
-      console.log('Transformed courses:', transformedCourses);
       setCourses(transformedCourses);
       setServerConnected(true);
-      console.log('Server connected successfully!');
     } catch (err) {
-      console.error('Error fetching courses:', err);
-      console.error('Error details:', err.response?.data || err.message);
-      // Use fake data when server is not connected
-      setCourses(fakeCourses);
+      setCourses([]);
       setServerConnected(false);
-      setError('Server connection failed - showing offline courses');
+      setError('Server connection failed - could not load courses');
     } finally {
       setLoading(false);
     }
@@ -94,10 +89,19 @@ const HomePage = () => {
     }
   };
 
+  const { user } = useContext(AuthContext);
+  
+  const handleAdminClick = () => {
+    navigate('/admin');
+  };
+  
   const handleCourseClick = (courseId) => {
     if (!serverConnected) {
-      // Show error message when trying to access courses offline
       alert('Cannot access courses while offline. Please connect to the server first.');
+      return;
+    }
+    if (!user) {
+      navigate('/login');
       return;
     }
     navigate(`/course/${courseId}`);
@@ -144,28 +148,61 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Success Banner for server connection */}
-        {serverConnected && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex">
+        {/* Authentication Status Banner */}
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
+                <div className={`w-3 h-3 rounded-full ${user ? 'bg-green-400' : 'bg-red-400'}`}></div>
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-green-800">
-                  Server Connected Successfully
+                <h3 className="text-sm font-medium text-blue-800">
+                  Authentication Status
                 </h3>
-                <p className="text-sm text-green-700 mt-1">
-                  You can now access all course content and features.
+                <p className="text-sm text-blue-700">
+                  {user ? `Logged in as: ${user.name || user.email || 'User'}` : 'Not logged in'}
                 </p>
               </div>
+            </div>
+            {!user && (
+              <button
+                onClick={() => navigate('/login')}
+                className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+              >
+                Login →
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Admin Dashboard Button */}
+        {user && (user.role === 'admin' || user.role === 'instructor') && (
+          <div className="mb-6 bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-3 h-3 rounded-full bg-purple-400"></div>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-purple-800">
+                    Admin Access
+                  </h3>
+                  <p className="text-sm text-purple-700">
+                    You have {user.role} privileges. Manage courses and lectures.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleAdminClick}
+                className="text-sm text-purple-600 hover:text-purple-500 font-medium bg-purple-100 px-3 py-1 rounded-md hover:bg-purple-200 transition-colors"
+              >
+                Admin Dashboard →
+              </button>
             </div>
           </div>
         )}
 
-        {/* Error Banner for offline mode */}
+        {/* Success/Error Banner for server connection */}
         {error && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex">
@@ -177,7 +214,7 @@ const HomePage = () => {
                   Server Connection Failed
                 </h3>
                 <p className="text-sm text-red-700 mt-1">
-                  {error}. Some features may not work properly.
+                  {error}
                 </p>
                 <button
                   onClick={fetchCourses}
@@ -252,16 +289,17 @@ const HomePage = () => {
                 </div>
 
                 {/* Continue Learning Button */ }
-            < button
-                  className = {`w-full py-2 px-4 rounded-md text-sm font-medium transition-colors ${course.buttonStyle === 'primary'
+            <button
+              onClick={() => handleCourseClick(course.id)}
+              className={`w-full py-2 px-4 rounded-md text-sm font-medium transition-colors ${course.buttonStyle === 'primary'
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : course.buttonStyle === 'dark'
                   ? 'bg-gray-700 text-white hover:bg-gray-800'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
-                >
-          {!serverConnected ? 'Coming Soon' : 'Continue Learning'} <ChevronRight className="inline h-4 w-4 ml-1" />
-        </button>
+            >
+              {!serverConnected ? 'Coming Soon' : 'Continue Learning'} <ChevronRight className="inline h-4 w-4 ml-1" />
+            </button>
       </div>
     </div>
   ))

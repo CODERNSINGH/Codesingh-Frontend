@@ -21,7 +21,7 @@ const Register = () => {
     setError('');
     setSuccess('');
     try {
-      await axios.post(`${API_ENDPOINTS.REGISTER}`, {
+      await axios.post(API_ENDPOINTS.AUTH_REGISTER, {
         username,
         email,
         password,
@@ -32,7 +32,7 @@ const Register = () => {
       setPassword('');
       setTimeout(() => navigate('/login'), 1500);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed');
+      setError(err.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -46,7 +46,7 @@ const Register = () => {
           <FaUser className="absolute left-3 top-3 text-gray-400" />
           <input
             type="text"
-            placeholder="Username"
+            placeholder="Email"
             value={username}
             onChange={e => setUsername(e.target.value)}
             className="pl-10 w-full p-3 border rounded-lg focus:outline-blue-500 focus:ring-2 focus:ring-blue-200"
@@ -58,7 +58,7 @@ const Register = () => {
           <FaEnvelope className="absolute left-3 top-3 text-gray-400" />
           <input
             type="email"
-            placeholder="Email"
+            placeholder="Confirm Email"
             value={email}
             onChange={e => setEmail(e.target.value)}
             className="pl-10 w-full p-3 border rounded-lg focus:outline-blue-500 focus:ring-2 focus:ring-blue-200"

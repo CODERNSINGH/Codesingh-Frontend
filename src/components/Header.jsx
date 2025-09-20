@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState,useContext } from 'react';
+// import React, { useContext } from 'react';
+import { AuthContext } from '../contexts/AuthContext.jsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronDown, Bell, Search, Menu, X } from 'lucide-react';
 import ComingSoon from './ComingSoon';
@@ -6,7 +8,6 @@ import ComingSoon from './ComingSoon';
 const getUser = () => {
   const token = localStorage.getItem('accessToken');
   if (!token) return null;
-  return { username: 'User' }; // Replace with actual username if decoding JWT
 };
 
 const Header = () => {
@@ -16,7 +17,7 @@ const Header = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const [comingSoonConfig, setComingSoonConfig] = useState({});
-  const user = getUser();
+  const { user, logout } = useContext(AuthContext);
 
   const navigation = [
     { name: 'Explore', href: '/', current: location.pathname === '/', comingSoon: false },
@@ -36,9 +37,7 @@ const Header = () => {
   };
 
   const handleSignOut = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    setIsUserMenuOpen(false);
+    logout();
     navigate('/login');
   };
 
@@ -100,14 +99,30 @@ const Header = () => {
                   className="flex items-center space-x-2 p-1 rounded-md hover:bg-gray-50"
                 >
                   <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-medium text-white">{user.username[0]}</span>
+                    <span className="text-sm font-medium text-white">{user.username ? user.username[0].toUpperCase() : '?'}</span>
                   </div>
+                  <span className="hidden sm:inline text-gray-700 font-medium ml-2">{user.username}</span>
                   <ChevronDown className="h-4 w-4 text-gray-600" />
                 </button>
                 {isUserMenuOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
                     <span className="block px-4 py-2 text-sm text-gray-700">Signed in as <b>{user.username}</b></span>
+                    <span className="block px-4 py-2 text-xs text-gray-500">Role: {user.role}</span>
                     <hr className="my-1" />
+                    {(user.role === 'admin' || user.role === 'instructor') && (
+                      <>
+                        <button
+                          onClick={() => {
+                            navigate('/admin');
+                            setIsUserMenuOpen(false);
+                          }}
+                          className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Admin Dashboard
+                        </button>
+                        <hr className="my-1" />
+                      </>
+                    )}
                     <button
                       onClick={handleSignOut}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"

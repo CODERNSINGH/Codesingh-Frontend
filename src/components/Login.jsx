@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { FaUser, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { ClipLoader } from 'react-spinners';
 import { API_ENDPOINTS } from '../config/api';
+import { AuthContext } from '../contexts/AuthContext';
 
 const Login = ({ onLogin }) => {
   const [username, setUsername] = useState('');
@@ -12,6 +13,7 @@ const Login = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,16 +21,30 @@ const Login = ({ onLogin }) => {
     setError('');
     try {
       const response = await axios.post(
-        `${API_ENDPOINTS.LOGIN}`,
-        { username, password }
+        API_ENDPOINTS.AUTH_LOGIN,
+        { email: username, password }
       );
-      const { access, refresh } = response.data;
-      localStorage.setItem('accessToken', access);
-      localStorage.setItem('refreshToken', refresh);
-      if (onLogin) onLogin(access);
+      // Backend returns: { success: true, message: "...", data: { accessToken, refreshToken, user } }
+      if (!response.data.success) {
+        throw new Error(response.data.message || 'Login failed');
+      }
+      
+      const { accessToken, refreshToken, user } = response.data.data;
+      
+      if (!accessToken || !user) {
+        throw new Error('Invalid response from server');
+      }
+      
+      // Use AuthContext login function to update state
+      login(accessToken, user);
+      
+      // Also store refresh token separately
+      localStorage.setItem('refreshToken', refreshToken);
+      
+      if (onLogin) onLogin(accessToken);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Invalid credentials');
+      setError(err.response?.data?.message || 'Invalid credentials');
     } finally {
       setLoading(false);
     }
@@ -42,7 +58,7 @@ const Login = ({ onLogin }) => {
           <FaUser className="absolute left-3 top-3 text-gray-400" />
           <input
             type="text"
-            placeholder="Username"
+            placeholder="Email"
             value={username}
             onChange={e => setUsername(e.target.value)}
             className="pl-10 w-full p-3 border rounded-lg focus:outline-blue-500 focus:ring-2 focus:ring-blue-200"
